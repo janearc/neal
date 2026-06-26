@@ -7,3 +7,6 @@ __pycache__/
 .ruff_cache/
 uv.lock
 .DS_Store
+
+# local building aid: the vision/why-context. faithful and personal, kept out of git.
+VISION.md

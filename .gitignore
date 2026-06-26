@@ -1,0 +1,9 @@
+# python project: virtualenvs, caches, lockfiles stay out. pipeline data lives under
+# ~/var/neal (outside this tree) and never lands here.
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+uv.lock
+.DS_Store

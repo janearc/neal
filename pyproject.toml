@@ -1,0 +1,22 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "neal"
+version = "0.0.1"
+description = "Turns dictated narration into a durable, provenance-tracked story graph. Memory and synthesis only — the writer writes."
+requires-python = ">=3.11"
+dependencies = [
+    # The deterministic, model-free prepass leans on wonderlib (markdown→XML +
+    # lexical rarity profiling → candidate node vocabulary). Pinned to the public
+    # package, not a local path — re-sync by bumping this reference.
+    "wonderlib @ git+https://github.com/janearc/wonderlib.git",
+]
+
+[tool.hatch.metadata]
+# Required to allow the direct git reference to wonderlib above.
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["neal"]

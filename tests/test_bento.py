@@ -2,11 +2,11 @@ import pytest
 
 from neal.bento import (
     create_bento,
-    inbox,
     ingest,
     ingest_inbox,
     list_bentos,
     neal_home,
+    parent_of,
     record_stage,
     resolve_bento,
 )
@@ -83,19 +83,35 @@ def test_name_collision_between_distinct_sources_is_not_clobbered(tmp_path):
 def test_neal_home_env_override(tmp_path, monkeypatch):
     monkeypatch.setenv("NEAL_HOME", str(tmp_path / "home"))
     assert neal_home() == tmp_path / "home"
-    assert inbox() == tmp_path / "home" / "inbox"
 
 
-def test_ingest_inbox_seeds_from_inbox_and_leaves_it(tmp_path, monkeypatch):
-    home = tmp_path / "home"
-    (home / "inbox").mkdir(parents=True)
-    (home / "inbox" / "drop.md").write_text("dropped narration")
-    monkeypatch.setenv("NEAL_HOME", str(home))
+def test_create_bento_has_its_own_inbox(tmp_path):
+    b = create_bento(tmp_path)
+    assert b.inbox.is_dir()
+    assert b.inbox == b.root / "inbox"
 
-    b = ingest_inbox()
 
+def test_ingest_inbox_snapshots_the_bentos_own_inbox(tmp_path):
+    b = create_bento(tmp_path)
+    (b.inbox / "drop.md").write_text("dropped narration")
+
+    copied = ingest_inbox(b)
+
+    assert copied == ["drop.md"]
     assert (b.raw_data / "drop.md").read_text() == "dropped narration"
-    assert (home / "inbox" / "drop.md").exists()  # inbox file untouched
+    assert (b.inbox / "drop.md").exists()  # inbox file left in place
+
+
+def test_create_bento_records_and_validates_parent(tmp_path):
+    first = create_bento(tmp_path, bento_id="parent-1")
+    child = create_bento(tmp_path, bento_id="child-1", parent=first.id)
+
+    assert child.read_manifest()["parent"] == "parent-1"
+    assert parent_of(child) == "parent-1"
+    assert parent_of(first) is None
+
+    with pytest.raises(LookupError, match="does not exist"):
+        create_bento(tmp_path, parent="nope")
 
 
 def test_record_stage(tmp_path):

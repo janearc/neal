@@ -17,6 +17,29 @@ dependencies = [
 [project.scripts]
 neal = "neal.cli:main"
 
+# dev-only: the regression suite + linter. neither is a runtime dependency -- neal
+# ships without them. install with `uv sync --group dev`.
+[dependency-groups]
+dev = [
+    "pytest",
+    "ruff",
+]
+
+# ruff: the lint gate. line-length matches the fleet (magpie/paling) at 100.
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+# E/F = pycodestyle + pyflakes (the bug-catching core); B = bugbear (real bug
+# patterns); N = pep8-naming; T201 = no stray print() in library code.
+select = ["E", "F", "B", "N", "T201"]
+
+[tool.ruff.lint.per-file-ignores]
+# the CLI's stdout IS the product (the bento id / candidate count); print() is correct.
+"neal/cli.py" = ["T201"]
+# the lint tools report their findings to stdout/stderr -- printing is the whole point.
+"tools/**/*.py" = ["T201"]
+
 [tool.hatch.metadata]
 # Required to allow the direct git reference to wonderlib above.
 allow-direct-references = true

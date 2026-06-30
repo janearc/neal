@@ -1,19 +1,18 @@
-"""Bento: neal's per-run container on disk.
-
-A *bento* is one extraction run, laid out under ``NEAL_HOME`` (default ``~/var/neal``)::
-
-    inbox/                     drop transcripts here
-    bentos/<uuid>/
-        raw_data/              the source narration, copied in (never moved)
-        outputs/
-            graph/             the durable artifact: nodes.jsonl, edges.jsonl
-            cards/             the projection: character/place/... markdown
-            render/            the story-bible PDF and its sources
-        manifest.json          what ran, which backend, per-stage stats
-
-neal writes only *candidate* bentos here; it never writes into the live screenplay
-canon. The writer curates what gets promoted.
-"""
+# Bento: neal's per-run container on disk.
+#
+# A bento is one extraction run, laid out under NEAL_HOME (default ~/var/neal):
+#
+#   inbox/                     drop transcripts here
+#   bentos/<uuid>/
+#       raw_data/              the source narration, copied in (never moved)
+#       outputs/
+#           graph/             the durable artifact: nodes.jsonl, edges.jsonl
+#           cards/             the projection: character/place/... markdown
+#           render/            the story-bible PDF and its sources
+#       manifest.json          what ran, which backend, per-stage stats
+#
+# neal writes only candidate bentos here; it never writes into the live screenplay
+# canon. The writer curates what gets promoted.
 
 from __future__ import annotations
 
@@ -33,7 +32,7 @@ TEXT_SUFFIXES = (".md", ".txt")
 
 
 def neal_home(home: Path | str | None = None) -> Path:
-    """Resolve NEAL_HOME: explicit arg wins, then the env var, then the default."""
+    # resolve NEAL_HOME: explicit arg wins, then the env var, then the default.
     if home is not None:
         return Path(home)
     env = os.environ.get("NEAL_HOME")
@@ -48,10 +47,9 @@ def _utcnow() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+# a handle to one bento on disk. Paths are derived; nothing is cached.
 @dataclass(frozen=True)
 class Bento:
-    """A handle to one bento on disk. Paths are derived; nothing is cached."""
-
     id: str
     root: Path
 
@@ -90,7 +88,7 @@ class Bento:
 
 
 def create_bento(home: Path | str | None = None, *, bento_id: str | None = None) -> Bento:
-    """Mint a new bento: a fresh uuid, the directory tree, and an initial manifest."""
+    # mint a new bento: a fresh uuid, the directory tree, and an initial manifest.
     bid = bento_id or str(uuid.uuid4())
     root = neal_home(home) / "bentos" / bid
     bento = Bento(id=bid, root=root)
@@ -117,12 +115,10 @@ def ingest(
     *,
     suffixes: tuple[str, ...] = TEXT_SUFFIXES,
 ) -> list[str]:
-    """Copy source narration into the bento's ``raw_data`` -- never moves the source.
-
-    ``sources`` may be files or directories; directories are walked for ``suffixes``.
-    A name collision between *distinct* sources is disambiguated rather than
-    clobbered. Returns the raw_data filenames copied this call; updates the manifest.
-    """
+    # copy source narration into the bento's raw_data -- never moves the source.
+    # `sources` may be files or directories; directories are walked for `suffixes`.
+    # A name collision between distinct sources is disambiguated rather than
+    # clobbered. Returns the raw_data filenames copied this call; updates the manifest.
     candidates: list[Path] = []
     for s in sources:
         p = Path(s)
@@ -158,14 +154,14 @@ def ingest(
 
 
 def record_stage(bento: Bento, stage: str, info: dict) -> None:
-    """Fold a stage's results into the manifest under ``stages.<stage>``."""
+    # fold a stage's results into the manifest under stages.<stage>.
     manifest = bento.read_manifest()
     manifest.setdefault("stages", {})[stage] = {"ran_at": _utcnow(), **info}
     bento.write_manifest(manifest)
 
 
 def ingest_inbox(home: Path | str | None = None) -> Bento:
-    """Convenience: a fresh bento seeded from everything currently in the inbox."""
+    # convenience: a fresh bento seeded from everything currently in the inbox.
     bento = create_bento(home)
     box = inbox(home)
     if box.is_dir():
@@ -181,7 +177,7 @@ def _created(bento: Bento) -> str:
 
 
 def list_bentos(home: Path | str | None = None) -> list[Bento]:
-    """All bentos under NEAL_HOME, oldest first by creation time."""
+    # all bentos under NEAL_HOME, oldest first by creation time.
     base = neal_home(home) / "bentos"
     if not base.is_dir():
         return []
@@ -194,10 +190,8 @@ def list_bentos(home: Path | str | None = None) -> list[Bento]:
 
 
 def resolve_bento(ref: str | None = None, home: Path | str | None = None) -> Bento:
-    """Resolve a bento by full id, unique id prefix, or (None/"latest") most recent.
-
-    Raises LookupError if there are no bentos, no match, or an ambiguous prefix.
-    """
+    # resolve a bento by full id, unique id prefix, or (None/"latest") most recent.
+    # raises LookupError if there are no bentos, no match, or an ambiguous prefix.
     bentos = list_bentos(home)
     if not bentos:
         raise LookupError("no bentos yet")

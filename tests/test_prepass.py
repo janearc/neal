@@ -13,7 +13,7 @@ class FakeProfile:
 
 
 def fake_profiler(*, text, title):
-    """A deterministic stand-in for wonderlib: 'rare' == capitalized tokens."""
+    # a deterministic stand-in for wonderlib: "rare" == capitalized tokens.
     terms = [w.strip(".,") for w in text.split() if w[:1].isupper()]
     return FakeProfile(rare_terms=terms)
 
@@ -84,7 +84,7 @@ def _spacy_model_available() -> bool:
     not _spacy_model_available(), reason="wonderlib/en_core_web_sm not installed"
 )
 def test_real_wonderlib_prepass_smoke(tmp_path):
-    """End-to-end through the real wonderlib profiler when it's available."""
+    # end-to-end through the real wonderlib profiler when it's available.
     b = create_bento(tmp_path)
     (tmp_path / "r.md").write_text(
         "The phantasmagorical denouement bewildered Aurelio in Llanfairpwllgwyngyll."

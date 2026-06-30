@@ -16,7 +16,7 @@ def _fake_profiler(*, text, title):
 
 @pytest.fixture(autouse=True)
 def home_and_profiler(tmp_path, monkeypatch):
-    """Every CLI test runs against a temp NEAL_HOME with the prepass profiler faked."""
+    # every CLI test runs against a temp NEAL_HOME with the prepass profiler faked.
     monkeypatch.setenv("NEAL_HOME", str(tmp_path))
     monkeypatch.setattr("neal.prepass._default_profiler", lambda: _fake_profiler)
     return tmp_path

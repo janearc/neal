@@ -9,24 +9,30 @@
 
 ## What it does
 
-A run is a bento. Audio is already text by the time neal sees it (transcribed upstream by
-magpie/turtledove and/or on-device voice memos); neal's inbox takes **raw text**:
+A run is a bento, and the lifecycle is **two-phase** (like the other services): you ask
+neal for a bento, fill its inbox, then build it. Audio is already text by the time neal
+sees it (transcribed upstream by magpie/turtledove and/or on-device voice memos); a
+bento's inbox takes **raw text**:
 
 ```
-~/var/neal/inbox/                      drop transcripts here
 ~/var/neal/bentos/<uuid>/
+  inbox/                               you drop transcripts here, then `neal build`
   raw_data/                            the source narration, copied in (never moved)
   outputs/
     graph/                             the durable artifact: nodes.jsonl, edges.jsonl
     cards/                             the projection: character/place/beat/... markdown
     render/                            the story-bible PDF + its source .dot/.mmd/.typ
-  manifest.json                        what ran, which backend, per-stage stats
+  manifest.json                        parent, what ran, which backend, per-stage stats
 ```
 
-You submit intent (a corpus of narration treated as continuous); neal owns the
-extraction. The corpus is **incremental** -- add ten more hours next month, re-run, merge
-into the same scope. That is the thing the hand-built vim+git rig could never do: it made
-you redo the whole synthesis by hand every time.
+`neal new [--from <parent>]` mints a bento (optionally onto a prior one); `neal build`
+runs the pipeline on it. The corpus is **incremental by lineage**, not by flattening:
+a bento records a `parent`, and building a child **composes onto** the parent's resolved
+output rather than re-running one ever-growing scope or collapsing everything into a single
+blob. So `456.output = synthesize(123.output, 456.output)`, with `123` left intact. That is
+the thing the hand-built vim+git rig could never do: it made you redo the whole synthesis by
+hand every time. *(Lineage + the two-phase lifecycle are built; the cross-bento `synthesize`
+fold is the next step -- today a child build resolves its own corpus.)*
 
 ### The node taxonomy
 

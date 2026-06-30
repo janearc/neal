@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 import pytest
 
+from neal.bento import list_bentos
 from neal.cli import main
 
 
@@ -21,9 +22,7 @@ class _TypingModel:
     # the CLI tests drive extract/build end-to-end without touching the mesh.
     def complete(self, prompt):
         terms = re.findall(r"^- (.+)$", prompt, re.MULTILINE)
-        return json.dumps(
-            [{"term": t, "kind": "character", "confidence": 0.9} for t in terms]
-        )
+        return json.dumps([{"term": t, "kind": "character", "confidence": 0.9} for t in terms])
 
 
 @pytest.fixture(autouse=True)
@@ -36,59 +35,78 @@ def home_and_fakes(tmp_path, monkeypatch):
     return tmp_path
 
 
-def test_run_from_explicit_source(tmp_path, capsys):
-    src = tmp_path / "session.md"
-    src.write_text("Mara walked to Riverton.")
+def test_new_creates_an_empty_bento_with_its_own_inbox(capsys):
+    assert main(["new"]) == 0
 
-    rc = main(["run", str(src)])
-
-    assert rc == 0
     out = capsys.readouterr().out
-    assert "bento " in out and "candidate term(s)" in out
-    # the candidates artifact exists under the (single) bento
-    from neal.bento import list_bentos
-
+    assert "bento " in out and "drop files in:" in out
     (bento,) = list_bentos()
-    candidates = (bento.graph / "candidates.jsonl").read_text()
-    assert "Riverton" in candidates
-    assert bento.read_manifest()["stages"]["prepass"]["backend"] == "wonderlib-prepass"
+    assert bento.inbox.is_dir()
+    assert bento.read_manifest()["parent"] is None
 
 
-def test_run_from_inbox(tmp_path, capsys):
-    (tmp_path / "inbox").mkdir()
-    (tmp_path / "inbox" / "drop.md").write_text("Tomas whittled.")
-
-    assert main(["run"]) == 0
-
-    from neal.bento import list_bentos
-
-    (bento,) = list_bentos()
-    assert "Tomas" in (bento.graph / "candidates.jsonl").read_text()
-    assert (tmp_path / "inbox" / "drop.md").exists()  # inbox left intact
-
-
-def test_ingest_then_prepass_latest(tmp_path, capsys):
+def test_new_with_sources_prefills(tmp_path, capsys):
     src = tmp_path / "s.md"
-    src.write_text("Abe met Zed.")
+    src.write_text("Mara.")
 
-    assert main(["ingest", str(src)]) == 0
-    assert main(["prepass"]) == 0  # default: most recent bento
+    assert main(["new", str(src)]) == 0
 
-    out = capsys.readouterr().out
-    assert "prepass" in out
+    assert "pre-filled with 1 file" in capsys.readouterr().out
+    (bento,) = list_bentos()
+    assert (bento.raw_data / "s.md").exists()
 
 
-def test_ls_lists_bentos(tmp_path, capsys):
-    src = tmp_path / "x.md"
-    src.write_text("Quill.")
-    main(["ingest", str(src)])
-    capsys.readouterr()  # drop the ingest line
+def test_new_from_parent_records_lineage(capsys):
+    main(["new"])
+    (parent,) = list_bentos()
+    capsys.readouterr()
+
+    assert main(["new", "--from", parent.id]) == 0
+
+    assert f"onto {parent.id}" in capsys.readouterr().out
+    child = next(b for b in list_bentos() if b.id != parent.id)
+    assert child.read_manifest()["parent"] == parent.id
+
+
+def test_build_end_to_end_from_inbox(capsys):
+    main(["new"])
+    (bento,) = list_bentos()
+    (bento.inbox / "session.md").write_text("Mara walked to Riverton.")
+    capsys.readouterr()
+
+    assert main(["build", bento.id]) == 0
+
+    stages = bento.read_manifest()["stages"]
+    assert set(stages) >= {"prepass", "extract", "merge"}
+    entities = [
+        json.loads(line)
+        for line in (bento.graph / "nodes.jsonl").read_text().splitlines()
+    ]
+    assert {"Mara", "Riverton"} <= {e["label"] for e in entities}
+    assert (bento.graph / "open_puzzles.jsonl").exists()
+
+
+def test_build_defaults_to_latest(capsys):
+    main(["new"])
+    (bento,) = list_bentos()
+    (bento.inbox / "n.md").write_text("Tomas met Mara.")
+    capsys.readouterr()
+
+    assert main(["build"]) == 0  # no id -> most recent
+
+    assert bento.read_manifest()["stages"]["merge"]["entities"] >= 1
+
+
+def test_ls_shows_lineage(capsys):
+    main(["new"])
+    (parent,) = list_bentos()
+    main(["new", "--from", parent.id])
+    capsys.readouterr()
 
     assert main(["ls"]) == 0
 
     out = capsys.readouterr().out
-    assert "files=1" in out
-    assert "stages=-" in out  # ingested but not yet prepassed
+    assert f"<- {parent.id}" in out
 
 
 def test_ls_empty(capsys):
@@ -96,66 +114,31 @@ def test_ls_empty(capsys):
     assert capsys.readouterr().out.strip() == "no bentos yet"
 
 
-def test_prepass_no_bentos_errors(capsys):
-    rc = main(["prepass"])
-
-    assert rc == 1
-    assert "no bentos yet" in capsys.readouterr().err
-
-
-def test_build_end_to_end(tmp_path, capsys):
-    src = tmp_path / "session.md"
-    src.write_text("Mara walked to Riverton.")
-
-    assert main(["build", str(src)]) == 0
-
-    from neal.bento import list_bentos
-
+def test_extract_before_prepass_errors_cleanly(capsys):
+    main(["new"])
     (bento,) = list_bentos()
-    stages = bento.read_manifest()["stages"]
-    assert set(stages) >= {"prepass", "extract", "merge"}
-    entities = [
-        json.loads(line)
-        for line in (bento.graph / "nodes.jsonl").read_text().splitlines()
-    ]
-    labels = {e["label"] for e in entities}
-    assert {"Mara", "Riverton"} <= labels
-    assert all(e["kind"] == "character" for e in entities)  # the fake types everything so
-    assert (bento.graph / "open_puzzles.jsonl").exists()
-
-
-def test_build_from_inbox(tmp_path):
-    (tmp_path / "inbox").mkdir()
-    (tmp_path / "inbox" / "drop.md").write_text("Tomas met Mara.")
-
-    assert main(["build"]) == 0
-
-    from neal.bento import list_bentos
-
-    (bento,) = list_bentos()
-    assert bento.read_manifest()["stages"]["merge"]["entities"] >= 1
-
-
-def test_extract_before_prepass_errors_cleanly(tmp_path, capsys):
-    src = tmp_path / "s.md"
-    src.write_text("Mara.")
-    main(["ingest", str(src)])
+    (bento.inbox / "s.md").write_text("Mara.")
     capsys.readouterr()
 
-    rc = main(["extract"])  # no prepass yet
+    rc = main(["extract", bento.id])  # no prepass/ingest yet
 
     assert rc == 1
-    assert "candidates" in capsys.readouterr().err  # clean message, not a traceback
+    assert "candidates" in capsys.readouterr().err
 
 
-def test_merge_before_extract_errors_cleanly(tmp_path, capsys):
-    src = tmp_path / "s.md"
-    src.write_text("Mara.")
-    main(["ingest", str(src)])
-    main(["prepass"])
+def test_merge_before_extract_errors_cleanly(capsys):
+    main(["new"])
+    (bento,) = list_bentos()
     capsys.readouterr()
 
-    rc = main(["merge"])  # no extraction yet
+    rc = main(["merge", bento.id])  # no extraction yet
 
     assert rc == 1
     assert "extraction" in capsys.readouterr().err
+
+
+def test_new_from_missing_parent_errors(capsys):
+    rc = main(["new", "--from", "nonexistent"])
+
+    assert rc == 1
+    assert "no bento" in capsys.readouterr().err.lower()

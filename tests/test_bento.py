@@ -1,10 +1,14 @@
+import pytest
+
 from neal.bento import (
     create_bento,
     inbox,
     ingest,
     ingest_inbox,
+    list_bentos,
     neal_home,
     record_stage,
+    resolve_bento,
 )
 
 
@@ -103,3 +107,40 @@ def test_record_stage(tmp_path):
     assert stage["backend"] == "x"
     assert stage["documents"] == 2
     assert "ran_at" in stage
+
+
+def test_list_bentos_empty_then_ordered(tmp_path):
+    assert list_bentos(tmp_path) == []
+    first = create_bento(tmp_path, bento_id="aaaa-1")
+    second = create_bento(tmp_path, bento_id="bbbb-2")
+
+    listed = list_bentos(tmp_path)
+
+    assert [b.id for b in listed] == [first.id, second.id]  # oldest first by created
+
+
+def test_resolve_bento_latest_and_exact(tmp_path):
+    create_bento(tmp_path, bento_id="old")
+    newest = create_bento(tmp_path, bento_id="new")
+
+    assert resolve_bento(None, tmp_path).id == newest.id
+    assert resolve_bento("latest", tmp_path).id == newest.id
+    assert resolve_bento("old", tmp_path).id == "old"
+
+
+def test_resolve_bento_unique_prefix(tmp_path):
+    create_bento(tmp_path, bento_id="abc-123")
+
+    assert resolve_bento("abc", tmp_path).id == "abc-123"
+
+
+def test_resolve_bento_errors(tmp_path):
+    with pytest.raises(LookupError, match="no bentos yet"):
+        resolve_bento(None, tmp_path)
+
+    create_bento(tmp_path, bento_id="dup-1")
+    create_bento(tmp_path, bento_id="dup-2")
+    with pytest.raises(LookupError, match="no bento matching"):
+        resolve_bento("zzz", tmp_path)
+    with pytest.raises(LookupError, match="ambiguous"):
+        resolve_bento("dup", tmp_path)

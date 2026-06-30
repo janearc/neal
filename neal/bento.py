@@ -39,10 +39,6 @@ def neal_home(home: Path | str | None = None) -> Path:
     return Path(env) if env else DEFAULT_HOME
 
 
-def inbox(home: Path | str | None = None) -> Path:
-    return neal_home(home) / "inbox"
-
-
 def _utcnow() -> str:
     # microsecond resolution: bentos created in the same second must still order
     # strictly by creation, so list_bentos / "latest" don't fall back to a
@@ -55,6 +51,11 @@ def _utcnow() -> str:
 class Bento:
     id: str
     root: Path
+
+    @property
+    def inbox(self) -> Path:
+        # the bento's own drop zone -- you fill this, then build ingests it.
+        return self.root / "inbox"
 
     @property
     def raw_data(self) -> Path:
@@ -90,16 +91,26 @@ class Bento:
         )
 
 
-def create_bento(home: Path | str | None = None, *, bento_id: str | None = None) -> Bento:
-    # mint a new bento: a fresh uuid, the directory tree, and an initial manifest.
+def create_bento(
+    home: Path | str | None = None,
+    *,
+    bento_id: str | None = None,
+    parent: str | None = None,
+) -> Bento:
+    # mint a new bento: a fresh uuid, the directory tree (including its own inbox), and
+    # an initial manifest. `parent` links this bento to a prior one in a lineage -- a
+    # later build composes onto the parent's output rather than starting from scratch.
+    if parent is not None and not (neal_home(home) / "bentos" / parent / "manifest.json").is_file():
+        raise LookupError(f"parent bento {parent!r} does not exist")
     bid = bento_id or str(uuid.uuid4())
     root = neal_home(home) / "bentos" / bid
     bento = Bento(id=bid, root=root)
-    for d in (bento.raw_data, bento.graph, bento.cards, bento.render):
+    for d in (bento.inbox, bento.raw_data, bento.graph, bento.cards, bento.render):
         d.mkdir(parents=True, exist_ok=True)
     bento.write_manifest(
         {
             "bento_id": bid,
+            "parent": parent,
             "created": _utcnow(),
             "raw_data": {"files": [], "count": 0},
             "stages": {},
@@ -163,13 +174,17 @@ def record_stage(bento: Bento, stage: str, info: dict) -> None:
     bento.write_manifest(manifest)
 
 
-def ingest_inbox(home: Path | str | None = None) -> Bento:
-    # convenience: a fresh bento seeded from everything currently in the inbox.
-    bento = create_bento(home)
-    box = inbox(home)
-    if box.is_dir():
-        ingest(bento, [box])
-    return bento
+def ingest_inbox(bento: Bento) -> list[str]:
+    # snapshot the bento's own inbox into raw_data (copy, never move). returns the
+    # filenames ingested. the build step's first move: capture what was dropped in.
+    if bento.inbox.is_dir():
+        return ingest(bento, [bento.inbox])
+    return []
+
+
+def parent_of(bento: Bento) -> str | None:
+    # the id of the bento this one composes onto, or None if it starts a lineage.
+    return bento.read_manifest().get("parent")
 
 
 def _created(bento: Bento) -> str:

@@ -1,13 +1,12 @@
-"""The ``neal`` command -- a thin wrapper over the library.
-
-No logic lives here: each subcommand calls neal.bento / neal.prepass and prints a
-line. The library is the product; the CLI is just a way to drive it.
-
-    neal run [SOURCE...]      ingest then prepass (no SOURCE = the inbox)
-    neal ingest [SOURCE...]   new bento from SOURCEs (default: the inbox)
-    neal prepass [BENTO]      run the prepass on a bento (default: most recent)
-    neal ls                   list bentos
-"""
+# The `neal` command -- a thin wrapper over the library.
+#
+# No logic lives here: each subcommand calls neal.bento / neal.prepass and prints a
+# line. The library is the product; the CLI is just a way to drive it.
+#
+#   neal run [SOURCE...]      ingest then prepass (no SOURCE = the inbox)
+#   neal ingest [SOURCE...]   new bento from SOURCEs (default: the inbox)
+#   neal prepass [BENTO]      run the prepass on a bento (default: most recent)
+#   neal ls                   list bentos
 
 from __future__ import annotations
 

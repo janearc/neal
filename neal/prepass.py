@@ -1,15 +1,14 @@
-"""Deterministic prepass: raw narration -> a candidate node vocabulary.
-
-No model, no mesh. For each document in a bento's ``raw_data``, wonderlib computes
-Zipf + part-of-speech lexical rarity and surfaces the *rare terms* that carry the
-document's signal. neal folds those across the corpus into a sparse **candidate
-vocabulary** -- the corpus-derived starting point the extraction engine will later
-confirm, type, and merge into the graph.
-
-Nothing here is canon. Every candidate is ``kind: UNKNOWN`` until a model types it,
-and carries provenance (which documents surfaced it) and the backend that produced
-it. neal does not invent: if the corpus is silent, the term simply is not here.
-"""
+# Deterministic prepass: raw narration -> a candidate node vocabulary.
+#
+# No model, no mesh. For each document in a bento's raw_data, wonderlib computes
+# Zipf + part-of-speech lexical rarity and surfaces the rare terms that carry the
+# document's signal. neal folds those across the corpus into a sparse candidate
+# vocabulary -- the corpus-derived starting point the extraction engine will later
+# confirm, type, and merge into the graph.
+#
+# Nothing here is canon. Every candidate is kind: UNKNOWN until a model types it,
+# and carries provenance (which documents surfaced it) and the backend that produced
+# it. neal does not invent: if the corpus is silent, the term simply is not here.
 
 from __future__ import annotations
 
@@ -43,12 +42,10 @@ def candidate_vocabulary(
     *,
     profiler: Profiler | None = None,
 ) -> list[dict]:
-    """Profile each ``(title, text)`` document and fold rare terms into candidates.
-
-    Returns one record per distinct term -- its surface form, the (sorted, unique)
-    documents that surfaced it, a document count, the producing backend, and an
-    explicit ``UNKNOWN`` kind. Records are sorted by term for a stable artifact.
-    """
+    # profile each (title, text) document and fold rare terms into candidates.
+    # returns one record per distinct term -- its surface form, the (sorted, unique)
+    # documents that surfaced it, a document count, the producing backend, and an
+    # explicit UNKNOWN kind. records are sorted by term for a stable artifact.
     profile = profiler or _default_profiler()
     sources: dict[str, set[str]] = defaultdict(set)
     for title, text in documents:
@@ -81,11 +78,9 @@ def _load_documents(bento: Bento) -> list[tuple[str, str]]:
 
 
 def run_prepass(bento: Bento, *, profiler: Profiler | None = None) -> Path:
-    """Run the prepass over a bento's ``raw_data`` and write the candidate vocabulary.
-
-    Writes ``outputs/graph/candidates.jsonl`` (one JSON record per line) and records
-    a ``prepass`` stage in the manifest. Returns the candidates path.
-    """
+    # run the prepass over a bento's raw_data and write the candidate vocabulary.
+    # writes outputs/graph/candidates.jsonl (one JSON record per line) and records
+    # a prepass stage in the manifest. returns the candidates path.
     documents = _load_documents(bento)
     candidates = candidate_vocabulary(documents, profiler=profiler)
 

@@ -14,6 +14,9 @@ dependencies = [
     "wonderlib @ git+https://github.com/janearc/wonderlib.git",
 ]
 
+[project.scripts]
+neal = "neal.cli:main"
+
 [tool.hatch.metadata]
 # Required to allow the direct git reference to wonderlib above.
 allow-direct-references = true

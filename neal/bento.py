@@ -171,3 +171,44 @@ def ingest_inbox(home: Path | str | None = None) -> Bento:
     if box.is_dir():
         ingest(bento, [box])
     return bento
+
+
+def _created(bento: Bento) -> str:
+    try:
+        return bento.read_manifest().get("created", "")
+    except (OSError, ValueError):
+        return ""
+
+
+def list_bentos(home: Path | str | None = None) -> list[Bento]:
+    """All bentos under NEAL_HOME, oldest first by creation time."""
+    base = neal_home(home) / "bentos"
+    if not base.is_dir():
+        return []
+    bentos = [
+        Bento(id=d.name, root=d)
+        for d in base.iterdir()
+        if d.is_dir() and (d / "manifest.json").is_file()
+    ]
+    return sorted(bentos, key=_created)
+
+
+def resolve_bento(ref: str | None = None, home: Path | str | None = None) -> Bento:
+    """Resolve a bento by full id, unique id prefix, or (None/"latest") most recent.
+
+    Raises LookupError if there are no bentos, no match, or an ambiguous prefix.
+    """
+    bentos = list_bentos(home)
+    if not bentos:
+        raise LookupError("no bentos yet")
+    if ref is None or ref == "latest":
+        return bentos[-1]
+    exact = [b for b in bentos if b.id == ref]
+    if exact:
+        return exact[0]
+    matches = [b for b in bentos if b.id.startswith(ref)]
+    if not matches:
+        raise LookupError(f"no bento matching {ref!r}")
+    if len(matches) > 1:
+        raise LookupError(f"ambiguous bento ref {ref!r} ({len(matches)} matches)")
+    return matches[0]

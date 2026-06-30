@@ -6,12 +6,17 @@ build-backend = "hatchling.build"
 name = "neal"
 version = "0.0.1"
 description = "Turns dictated narration into a durable, provenance-tracked story graph. Memory and synthesis only — the writer writes."
-requires-python = ">=3.11"
+# 3.12 to match the fleet and the good-citizen client (which requires >=3.12).
+requires-python = ">=3.12"
 dependencies = [
     # The deterministic, model-free prepass leans on wonderlib (markdown→XML +
     # lexical rarity profiling → candidate node vocabulary). Pinned to the public
     # package, not a local path — re-sync by bumping this reference.
     "wonderlib @ git+https://github.com/janearc/wonderlib.git",
+    # The model seam resolves models (e.g. mistral) through delightd discovery via the
+    # good-citizen client, fail-closed — the same path the rest of the fleet uses.
+    # Pinned to the fleet rev (the package is mid-refactor on the repo's main).
+    "blm-good-citizen @ git+https://github.com/janearc/big-little-mesh.git@3f43bb2558b68853e1c57951f78710b84ec85f81#subdirectory=python",
 ]
 
 [project.scripts]

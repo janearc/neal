@@ -148,11 +148,11 @@ def _operational_errors() -> tuple[type[BaseException], ...]:
     # a stage run out of order, or the model being unavailable (fail-closed).
     errs: list[type[BaseException]] = [LookupError, ExtractionError, MergeError]
     try:
-        from good_citizen.model import ModelUnavailable
+        from frood.model import ModelUnavailable
 
         errs.append(ModelUnavailable)
     except Exception:
-        # good_citizen not importable here just means there's nothing extra to catch.
+        # frood not importable here just means there's nothing extra to catch.
         pass
     return tuple(errs)
 

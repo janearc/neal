@@ -22,15 +22,15 @@ class ModelClient(Protocol):
 
 
 class DiscoveryModel:
-    # the real ModelClient: resolves `name` via delightd discovery (good_citizen,
-    # fail-closed) and runs one non-streaming completion. complete() may raise
-    # good_citizen.model.ModelUnavailable when nothing healthy serves the model --
-    # neal lets that propagate rather than fabricating a result.
+    # the real ModelClient: resolves `name` via delightd discovery (frood, fail-closed)
+    # and runs one non-streaming completion. complete() may raise
+    # frood.model.ModelUnavailable when nothing healthy serves the model -- neal lets
+    # that propagate rather than fabricating a result.
     def __init__(self, name: str = DEFAULT_MODEL, *, delightd_url: str | None = None):
         self.name = name
         self.delightd_url = delightd_url
 
     def complete(self, prompt: str) -> str:
-        from good_citizen import model  # lazy: keep the mesh dependency out of import time
+        from frood import model  # lazy: keep the mesh dependency out of import time
 
         return model.generate(self.name, prompt, delightd_url=self.delightd_url)

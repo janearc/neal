@@ -1,4 +1,4 @@
-import good_citizen.model as gcmodel
+import frood.model as gcmodel
 import pytest
 
 from neal.model import DEFAULT_MODEL, DiscoveryModel, ModelClient
@@ -17,7 +17,7 @@ def test_fake_satisfies_the_seam_protocol():
     assert isinstance(_FakeModel(), ModelClient)
 
 
-def test_discovery_model_delegates_to_good_citizen(monkeypatch):
+def test_discovery_model_delegates_to_frood(monkeypatch):
     captured = {}
 
     def fake_generate(name, prompt, delightd_url=None, **opts):

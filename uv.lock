@@ -47,6 +47,15 @@ wheels = [
 ]
 
 [[package]]
+name = "big-little-mesh-frood"
+version = "0.4.1"
+source = { git = "https://github.com/janearc/big-little-mesh.git?subdirectory=python&rev=acb1ed92c4bf346ff0e23b5443511d2a54ce3962#acb1ed92c4bf346ff0e23b5443511d2a54ce3962" }
+dependencies = [
+    { name = "protobuf" },
+    { name = "transitions" },
+]
+
+[[package]]
 name = "blis"
 version = "1.3.3"
 source = { registry = "https://pypi.org/simple" }
@@ -76,15 +85,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/d4/6c/671af79ee42bc4c968cae35c091ac89e8721c795bfa4639100670dc59139/blis-1.3.3-cp314-cp314-musllinux_1_2_aarch64.whl", hash = "sha256:e5a662c48cd4aad5dae1a950345df23957524f071315837a4c6feb7d3b288990", size = 3008771, upload-time = "2025-11-17T12:28:23.637Z" },
     { url = "https://files.pythonhosted.org/packages/be/92/7cd7f8490da7c98ee01557f2105885cc597217b0e7fd2eeb9e22cdd4ef23/blis-1.3.3-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:9de26fbd72bac900c273b76d46f0b45b77a28eace2e01f6ac6c2239531a413bb", size = 14219213, upload-time = "2025-11-17T12:28:26.143Z" },
     { url = "https://files.pythonhosted.org/packages/0a/de/acae8e9f9a1f4bb393d41c8265898b0f29772e38eac14e9f69d191e2c006/blis-1.3.3-cp314-cp314-win_amd64.whl", hash = "sha256:9e5fdf4211b1972400f8ff6dafe87cb689c5d84f046b4a76b207c0bd2270faaf", size = 6324695, upload-time = "2025-11-17T12:28:28.401Z" },
-]
-
-[[package]]
-name = "blm-good-citizen"
-version = "0.4.1"
-source = { git = "https://github.com/janearc/big-little-mesh.git?subdirectory=python&rev=3f43bb2558b68853e1c57951f78710b84ec85f81#3f43bb2558b68853e1c57951f78710b84ec85f81" }
-dependencies = [
-    { name = "protobuf" },
-    { name = "transitions" },
 ]
 
 [[package]]
@@ -641,7 +641,7 @@ name = "neal"
 version = "0.0.1"
 source = { editable = "." }
 dependencies = [
-    { name = "blm-good-citizen" },
+    { name = "big-little-mesh-frood" },
     { name = "wonderlib" },
 ]
 
@@ -654,7 +654,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "blm-good-citizen", git = "https://github.com/janearc/big-little-mesh.git?subdirectory=python&rev=3f43bb2558b68853e1c57951f78710b84ec85f81" },
+    { name = "big-little-mesh-frood", git = "https://github.com/janearc/big-little-mesh.git?subdirectory=python&rev=acb1ed92c4bf346ff0e23b5443511d2a54ce3962" },
     { name = "wonderlib", git = "https://github.com/janearc/wonderlib.git" },
 ]
 

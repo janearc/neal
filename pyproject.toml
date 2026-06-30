@@ -13,10 +13,11 @@ dependencies = [
     # lexical rarity profiling → candidate node vocabulary). Pinned to the public
     # package, not a local path — re-sync by bumping this reference.
     "wonderlib @ git+https://github.com/janearc/wonderlib.git",
-    # The model seam resolves models (e.g. mistral) through delightd discovery via the
-    # good-citizen client, fail-closed — the same path the rest of the fleet uses.
-    # Pinned to the fleet rev (the package is mid-refactor on the repo's main).
-    "blm-good-citizen @ git+https://github.com/janearc/big-little-mesh.git@3f43bb2558b68853e1c57951f78710b84ec85f81#subdirectory=python",
+    # The fleet's frood + birblib surface: the model client (resolves models through
+    # delightd discovery, fail-closed) and the birb archetype layer (BirbBento, Manifest,
+    # BirbHandlers, the FSM lifecycle). Pinned to the same big-little-mesh rev magpie uses
+    # (the good_citizen->frood rename merge); bump deliberately when the surface changes.
+    "big-little-mesh-frood @ git+https://github.com/janearc/big-little-mesh.git@acb1ed92c4bf346ff0e23b5443511d2a54ce3962#subdirectory=python",
 ]
 
 [project.scripts]

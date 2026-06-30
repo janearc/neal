@@ -19,7 +19,7 @@ from dataclasses import asdict, dataclass
 from difflib import SequenceMatcher
 from pathlib import Path
 
-from neal.bento import Bento, record_stage
+from neal.bento import Bento, parent_of, record_stage
 
 UNKNOWN = "UNKNOWN"
 # SequenceMatcher ratio above which two same-kind labels are *suggested* as the same
@@ -140,6 +140,11 @@ def run_merge(bento: Bento) -> Path:
     raw = [json.loads(line) for line in nodes_path.read_text().splitlines() if line.strip()]
 
     entities = merge_nodes(raw)
+    # stamp which bento each mention came from, so a later synthesis across a lineage
+    # keeps every entity's provenance traceable to its originating bento.
+    for entity in entities:
+        for prov in entity.provenance:
+            prov["bento"] = bento.id
     puzzles = propose_merges(entities)
 
     nodes_path.write_text(
@@ -160,3 +165,111 @@ def run_merge(bento: Bento) -> Path:
         },
     )
     return nodes_path
+
+
+def _aliases(entity: dict) -> list[str]:
+    return entity.get("aliases") or [entity["label"]]
+
+
+def synthesize(parent_entities: list[dict], child_entities: list[dict]) -> list[Entity]:
+    # fold a parent's resolved entities with a child's into one composed graph. a label
+    # present in both lineages becomes a single entity carrying both sets of provenance;
+    # support sums, kinds reconcile (the loser surfaced in kind_alternatives), aliases and
+    # backends union. neither input is mutated -- the parent's graph is left intact.
+    groups: dict[str, list[dict]] = defaultdict(list)
+    for entity in [*parent_entities, *child_entities]:
+        groups[_norm(entity["label"])].append(entity)
+
+    composed: list[Entity] = []
+    for group in groups.values():
+        # canonical label: the best-supported entity's surface form, ties alphabetical.
+        label = sorted(group, key=lambda e: (-e.get("support", 1), e["label"]))[0]["label"]
+
+        by_kind: dict[str, float] = defaultdict(float)
+        for e in group:
+            by_kind[e["kind"]] += e.get("support", 1)
+        chosen = sorted(by_kind.items(), key=lambda kv: (kv[0] == UNKNOWN, -kv[1], kv[0]))[0][0]
+        alternatives = sorted(
+            {
+                k
+                for e in group
+                for k in [e["kind"], *e.get("kind_alternatives", [])]
+                if k != chosen
+            }
+        )
+        confidence = max(
+            (e.get("confidence", 0.0) for e in group if e["kind"] == chosen), default=0.0
+        )
+        aliases = sorted({a for e in group for a in _aliases(e)})
+        backends = sorted({b for e in group for b in e.get("backends", [])})
+        # dedupe provenance so re-running synthesis is idempotent; support is the count
+        # of distinct corroborating mentions, derived from provenance rather than summed.
+        provenance: list[dict] = []
+        seen: set[tuple] = set()
+        for e in group:
+            for p in e.get("provenance", []):
+                key = (p.get("bento"), p.get("document"), p.get("window"), p.get("start"))
+                if key not in seen:
+                    seen.add(key)
+                    provenance.append(p)
+
+        composed.append(
+            Entity(
+                id=f"{chosen}:{_slug(label)}",
+                label=label,
+                kind=chosen,
+                aliases=aliases,
+                confidence=confidence,
+                support=len(provenance),
+                backends=backends,
+                kind_alternatives=alternatives,
+                provenance=provenance,
+            )
+        )
+    return sorted(composed, key=lambda e: e.id)
+
+
+def _read_entities(path: Path) -> list[dict]:
+    if not path.is_file():
+        return []
+    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+
+
+def run_synthesis(bento: Bento) -> Path | None:
+    # if the bento has a parent, compose this bento's resolved graph onto the parent's:
+    # 456.output = synthesize(123.output, 456.output). overwrites this bento's nodes.jsonl
+    # with the composition, re-surfaces near-duplicates, records a `synthesize` stage. the
+    # parent is read-only. no parent -> no-op (the bento stands alone). lineage chains
+    # transitively, since the parent's output already encodes its own parent.
+    parent_id = parent_of(bento)
+    if not parent_id:
+        return None
+
+    parent = Bento(id=parent_id, root=bento.root.parent / parent_id)
+    parent_entities = _read_entities(parent.graph / "nodes.jsonl")
+    if not parent_entities:
+        raise MergeError(f"parent bento {parent_id!r} has no resolved graph -- build it first")
+
+    child_path = bento.graph / "nodes.jsonl"
+    composed = synthesize(parent_entities, _read_entities(child_path))
+    child_path.write_text(
+        "".join(json.dumps(e.to_dict(), sort_keys=True) + "\n" for e in composed)
+    )
+    puzzles = propose_merges(composed)
+    (bento.graph / "open_puzzles.jsonl").write_text(
+        "".join(json.dumps(p, sort_keys=True) + "\n" for p in puzzles)
+    )
+
+    record_stage(
+        bento,
+        "synthesize",
+        {
+            "backend": "neal-merge",
+            "parent": parent_id,
+            "parent_entities": len(parent_entities),
+            "entities": len(composed),
+            "open_puzzles": len(puzzles),
+            "output": str(child_path.relative_to(bento.root)),
+        },
+    )
+    return child_path

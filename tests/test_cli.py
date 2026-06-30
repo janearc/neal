@@ -142,3 +142,48 @@ def test_new_from_missing_parent_errors(capsys):
 
     assert rc == 1
     assert "no bento" in capsys.readouterr().err.lower()
+
+
+def test_build_child_composes_onto_parent(capsys):
+    main(["new"])
+    (parent,) = list_bentos()
+    (parent.inbox / "a.md").write_text("Mara walked.")
+    main(["build", parent.id])
+    capsys.readouterr()
+
+    main(["new", "--from", parent.id])
+    child = next(b for b in list_bentos() if b.id != parent.id)
+    (child.inbox / "b.md").write_text("Mara and Tomas.")
+
+    assert main(["build", child.id]) == 0
+
+    assert "synthesize: composed onto" in capsys.readouterr().out
+    text = (child.graph / "nodes.jsonl").read_text()
+    composed = {r["label"]: r for r in (json.loads(line) for line in text.splitlines())}
+    assert {"Mara", "Tomas"} <= set(composed)
+    # Mara was seen in both bentos -> provenance carries both
+    assert {p["bento"] for p in composed["Mara"]["provenance"]} == {parent.id, child.id}
+
+
+def test_synthesize_command_no_parent(capsys):
+    main(["new"])
+    (bento,) = list_bentos()
+    capsys.readouterr()
+
+    assert main(["synthesize", bento.id]) == 0
+    assert "no parent" in capsys.readouterr().out
+
+
+def test_synthesize_command_standalone(capsys):
+    main(["new"])
+    (parent,) = list_bentos()
+    (parent.inbox / "a.md").write_text("Mara walked.")
+    main(["build", parent.id])
+    main(["new", "--from", parent.id])
+    child = next(b for b in list_bentos() if b.id != parent.id)
+    (child.inbox / "b.md").write_text("Mara again.")
+    main(["build", child.id])
+    capsys.readouterr()
+
+    assert main(["synthesize", child.id]) == 0  # idempotent re-run
+    assert "composed onto" in capsys.readouterr().out

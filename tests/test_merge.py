@@ -3,7 +3,35 @@ import json
 import pytest
 
 from neal.bento import create_bento
-from neal.merge import Entity, MergeError, merge_nodes, propose_merges, run_merge
+from neal.merge import (
+    Entity,
+    MergeError,
+    merge_nodes,
+    propose_merges,
+    run_merge,
+    run_synthesis,
+    synthesize,
+)
+
+
+def _entity(label, kind, *, support=1, confidence=0.9, bento="b", aliases=None, alts=None):
+    # support distinct mentions, one per window, so support == len(provenance) as it does
+    # in real merge output.
+    prov = [
+        {"document": "d.md", "window": i, "start": 0, "end": 1, "bento": bento}
+        for i in range(support)
+    ]
+    return {
+        "id": f"{kind}:{label.lower()}",
+        "label": label,
+        "kind": kind,
+        "aliases": aliases or [label],
+        "confidence": confidence,
+        "support": support,
+        "backends": ["mistral"],
+        "kind_alternatives": alts or [],
+        "provenance": prov,
+    }
 
 
 def _node(term, kind, confidence, *, document="d.md", window=0, backend="mistral"):
@@ -127,3 +155,73 @@ def test_run_merge_requires_extraction(tmp_path):
     b = create_bento(tmp_path)
     with pytest.raises(MergeError, match="run extraction first"):
         run_merge(b)
+
+
+def test_synthesize_folds_shared_label_across_bentos():
+    parent = [_entity("Mara", "character", support=2, bento="123")]
+    child = [
+        _entity("Mara", "character", support=1, bento="456"),
+        _entity("Tomas", "character", bento="456"),
+    ]
+
+    composed = synthesize(parent, child)
+
+    by = {e.label: e for e in composed}
+    assert set(by) == {"Mara", "Tomas"}
+    assert by["Mara"].support == 3  # 2 + 1
+    assert {p["bento"] for p in by["Mara"].provenance} == {"123", "456"}  # both lineages
+
+
+def test_synthesize_reconciles_kind_and_surfaces_conflict():
+    parent = [_entity("Riverton", "place", support=3, bento="123")]
+    child = [_entity("Riverton", "character", support=1, bento="456")]
+
+    (entity,) = synthesize(parent, child)
+
+    assert entity.kind == "place"  # 3 > 1
+    assert entity.kind_alternatives == ["character"]
+    assert entity.support == 4
+
+
+def test_run_synthesis_no_parent_is_noop(tmp_path):
+    b = create_bento(tmp_path)
+    assert run_synthesis(b) is None
+
+
+def test_run_synthesis_composes_onto_parent_and_leaves_it(tmp_path):
+    parent = create_bento(tmp_path, bento_id="p1")
+    (parent.graph / "nodes.jsonl").write_text(
+        json.dumps(_entity("Mara", "character", support=2, bento="p1")) + "\n"
+    )
+    child = create_bento(tmp_path, bento_id="c1", parent="p1")
+    (child.graph / "nodes.jsonl").write_text(
+        json.dumps(_entity("Mara", "character", support=1, bento="c1")) + "\n"
+        + json.dumps(_entity("Tomas", "character", bento="c1")) + "\n"
+    )
+
+    out = run_synthesis(child)
+
+    assert out == child.graph / "nodes.jsonl"
+    records = [json.loads(line) for line in out.read_text().splitlines()]
+    composed = {r["label"]: r for r in records}
+    assert composed["Mara"]["support"] == 3  # 2 distinct mentions from p1 + 1 from c1
+    assert {p["bento"] for p in composed["Mara"]["provenance"]} == {"p1", "c1"}
+    # the parent's graph is untouched
+    parent_text = (parent.graph / "nodes.jsonl").read_text()
+    parent_records = [json.loads(line) for line in parent_text.splitlines()]
+    assert len(parent_records) == 1 and parent_records[0]["support"] == 2
+
+    stage = child.read_manifest()["stages"]["synthesize"]
+    assert stage["parent"] == "p1"
+    assert stage["entities"] == 2
+
+
+def test_run_synthesis_requires_a_built_parent(tmp_path):
+    create_bento(tmp_path, bento_id="p2")  # parent never built -> no nodes.jsonl
+    child = create_bento(tmp_path, bento_id="c2", parent="p2")
+    (child.graph / "nodes.jsonl").write_text(
+        json.dumps(_entity("X", "character", bento="c2")) + "\n"
+    )
+
+    with pytest.raises(MergeError, match="build it first"):
+        run_synthesis(child)

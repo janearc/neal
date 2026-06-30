@@ -31,8 +31,9 @@ a bento records a `parent`, and building a child **composes onto** the parent's 
 output rather than re-running one ever-growing scope or collapsing everything into a single
 blob. So `456.output = synthesize(123.output, 456.output)`, with `123` left intact. That is
 the thing the hand-built vim+git rig could never do: it made you redo the whole synthesis by
-hand every time. *(Lineage + the two-phase lifecycle are built; the cross-bento `synthesize`
-fold is the next step -- today a child build resolves its own corpus.)*
+hand every time. *(Built: the two-phase lifecycle, lineage, and the cross-bento `synthesize`
+fold -- building a child composes its resolved graph onto its parent's, provenance stamped
+with each originating bento, the parent left intact.)*
 
 ### The node taxonomy
 

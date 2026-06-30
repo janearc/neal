@@ -5,10 +5,11 @@
 # parent (`--from`), and builds compose onto that lineage rather than flattening.
 #
 #   neal new [--from PARENT] [SOURCE...]   mint a bento (optionally onto PARENT)
-#   neal build [BENTO]                     ingest inbox -> prepass -> extract -> merge
+#   neal build [BENTO]                     inbox -> prepass -> extract -> merge -> synthesize
 #   neal prepass [BENTO]                   run the prepass on a bento
 #   neal extract [BENTO]                   type a bento's candidates into nodes
 #   neal merge [BENTO]                     fold a bento's nodes into the graph
+#   neal synthesize [BENTO]                compose a child's graph onto its parent's
 #   neal ls                                list bentos (with lineage)
 #
 # extract/build reach a model through delightd discovery (the good-citizen client),
@@ -30,7 +31,7 @@ from neal.bento import (
     resolve_bento,
 )
 from neal.extract import ExtractionError, run_extraction
-from neal.merge import MergeError, run_merge
+from neal.merge import MergeError, run_merge, run_synthesis
 from neal.model import DiscoveryModel, ModelClient
 from neal.prepass import run_prepass
 
@@ -58,6 +59,14 @@ def _merge(bento: Bento) -> None:
     print(f"  merge: {stage['entities']} entit(y/ies), {stage['open_puzzles']} open-puzzle(s)")
 
 
+def _synthesize(bento: Bento) -> None:
+    # silent when the bento has no parent (nothing to compose onto).
+    if run_synthesis(bento) is None:
+        return
+    stage = bento.read_manifest()["stages"]["synthesize"]
+    print(f"  synthesize: composed onto {stage['parent']} -> {stage['entities']} entit(y/ies)")
+
+
 def _cmd_new(args: argparse.Namespace) -> None:
     parent = resolve_bento(args.from_bento).id if args.from_bento else None
     bento = create_bento(parent=parent)
@@ -80,6 +89,7 @@ def _cmd_build(args: argparse.Namespace) -> None:
     _prepass(bento)
     _extract(bento)
     _merge(bento)
+    _synthesize(bento)
 
 
 def _cmd_prepass(args: argparse.Namespace) -> None:
@@ -92,6 +102,18 @@ def _cmd_extract(args: argparse.Namespace) -> None:
 
 def _cmd_merge(args: argparse.Namespace) -> None:
     _merge(resolve_bento(args.bento))
+
+
+def _cmd_synthesize(args: argparse.Namespace) -> None:
+    bento = resolve_bento(args.bento)
+    if run_synthesis(bento) is None:
+        print(f"{bento.id}: no parent, nothing to synthesize")
+        return
+    stage = bento.read_manifest()["stages"]["synthesize"]
+    print(
+        f"synthesize {bento.id}: composed onto {stage['parent']} "
+        f"-> {stage['entities']} entit(y/ies)"
+    )
 
 
 def _cmd_ls(args: argparse.Namespace) -> None:
@@ -136,6 +158,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_merge = sub.add_parser("merge", help="fold a bento's nodes into the graph")
     p_merge.add_argument("bento", nargs="?", help="bento id/prefix (default: most recent)")
     p_merge.set_defaults(func=_cmd_merge)
+
+    p_synth = sub.add_parser("synthesize", help="compose a child's graph onto its parent's")
+    p_synth.add_argument("bento", nargs="?", help="bento id/prefix (default: most recent)")
+    p_synth.set_defaults(func=_cmd_synthesize)
 
     p_ls = sub.add_parser("ls", help="list bentos (with lineage)")
     p_ls.set_defaults(func=_cmd_ls)

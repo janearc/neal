@@ -44,7 +44,10 @@ def inbox(home: Path | str | None = None) -> Path:
 
 
 def _utcnow() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    # microsecond resolution: bentos created in the same second must still order
+    # strictly by creation, so list_bentos / "latest" don't fall back to a
+    # filesystem-dependent iterdir order (which differs across platforms).
+    return datetime.now(timezone.utc).isoformat()
 
 
 # a handle to one bento on disk. Paths are derived; nothing is cached.
@@ -186,7 +189,8 @@ def list_bentos(home: Path | str | None = None) -> list[Bento]:
         for d in base.iterdir()
         if d.is_dir() and (d / "manifest.json").is_file()
     ]
-    return sorted(bentos, key=_created)
+    # order by creation, then id as a stable tiebreak -- never the filesystem order.
+    return sorted(bentos, key=lambda b: (_created(b), b.id))
 
 
 def resolve_bento(ref: str | None = None, home: Path | str | None = None) -> Bento:

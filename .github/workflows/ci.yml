@@ -7,7 +7,7 @@ name: ci
 # The gate runs exactly what a developer runs locally, in order:
 #   - ruff           lint (config in pyproject.toml: select E,F,B,N,T201 @ 100 cols)
 #   - no_docstrings  the house docstring ban (standards §4) -- ruff cannot express it
-#   - pytest         the full suite
+#   - pytest         the full suite, with an 80% coverage floor (--cov-fail-under)
 #
 # The prepass's real wonderlib path needs the spacy en_core_web_sm model, which CI
 # does not download; that one smoke test skips here and is covered locally. Every
@@ -46,5 +46,5 @@ jobs:
       - name: Bounce docstrings (standards §4)
         run: uv run python tools/lint/no_docstrings.py neal tests tools
 
-      - name: Test (pytest)
-        run: uv run pytest ./tests
+      - name: Test (pytest + coverage floor)
+        run: uv run pytest --cov=neal --cov-report=term-missing --cov-fail-under=80 ./tests

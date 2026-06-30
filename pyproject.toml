@@ -22,6 +22,7 @@ neal = "neal.cli:main"
 [dependency-groups]
 dev = [
     "pytest",
+    "pytest-cov",
     "ruff",
 ]
 
@@ -39,6 +40,11 @@ select = ["E", "F", "B", "N", "T201"]
 "neal/cli.py" = ["T201"]
 # the lint tools report their findings to stdout/stderr -- printing is the whole point.
 "tools/**/*.py" = ["T201"]
+
+# coverage: measure the neal package only; the CI step enforces an 80% floor
+# (we sit ~94%). source-scoped so test files and tooling don't pad the number.
+[tool.coverage.run]
+source = ["neal"]
 
 [tool.hatch.metadata]
 # Required to allow the direct git reference to wonderlib above.

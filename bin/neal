@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# neal -- fleet shim. delightd's exports engine finds this under bin/ and
+# symlinks it into ~/var/bin, so the first move is resolving the symlink back
+# to the real repo; uv then runs the CLI inside it, against the pinned lock.
+set -euo pipefail
+
+here="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+exec uv run --directory "$here" neal "$@"
